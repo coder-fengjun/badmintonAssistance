@@ -33,7 +33,6 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   (response: AxiosResponse<ResponseData>): AxiosResponse<ResponseData> => {
     const res = response.data
-
     // 假设后端返回格式为 { code: 200, data: xxx, message: '成功' }
     if (res.code !== 0) {
       console.error('接口错误:', res.message)

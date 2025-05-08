@@ -55,13 +55,14 @@ export function getSmsCode(data: any, token: string) {
 }
 
 // 登录账号
-export function onLoginSys(data: any) {
+export function onLoginSys(data: any, token: string) {
   return service({
     url: '/mobile/user_login',
     method: 'POST',
     data,
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      authorization: token,
     },
   })
 }

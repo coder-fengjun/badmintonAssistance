@@ -5,19 +5,35 @@
         <el-form
           :model="form"
           label-width="auto"
+          style="
+            max-width: 600px;
+            border: 5px solid #eee;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+          "
+        >
+          <el-form-item label="登录手机号：" prop="phone">
+            <el-input v-model="form.phone" style="width: 140px; margin-right: 10px" clearable />
+            <el-button type="primary" @click="onGetSmsCode">获取验证码</el-button>
+          </el-form-item>
+          <el-form-item label="验证码：" prop="code">
+            <el-input v-model="form.code" style="width: 140px; margin-right: 10px" clearable />
+            <el-button type="primary" style="margin-right: 10px" @click="onLogin">登录</el-button>
+            <span style="color: #589ff8" v-if="loginStatus === 0">登录成功！</span>
+          </el-form-item>
+          <span style="color: #589ff8">如果token失效，请重新登录获取～</span>
+          <h2 class="now-date-timer">{{ timeString }}</h2>
+        </el-form>
+        <el-form
+          :model="form"
+          label-width="auto"
           ref="ruleFormRef"
           :rules="rules"
           style="max-width: 600px"
         >
-
-          <el-form-item label="登录手机号：" prop="phone">
-            <el-input v-model="form.phone"  style="width: 140px; margin-right: 10px;" clearable/>
-            <el-button type="primary" @click="onGetSmsCode">获取验证码</el-button>
-          </el-form-item>
-          <el-form-item label="验证码：" prop="code">
-            <el-input v-model="form.code"  style="width: 140px; margin-right: 10px;" clearable/>
-            <el-button type="primary" style="margin-right: 10px;" @click="onLogin">登录</el-button>
-            <span style="color: #589ff8" v-if="loginStatus === 0">登录成功！</span>
+          <el-form-item label="登录Token：" prop="token">
+            <el-input v-model="form.token" clearable disabled />
           </el-form-item>
           <el-form-item label="日期：" prop="new_date">
             <el-date-picker
@@ -26,16 +42,18 @@
               placeholder="选择日期"
               size="default"
               value-format="YYYY-MM-DD"
+              @change="onSetInfo(ruleFormRef)"
               clearable
             />
           </el-form-item>
 
-          <el-form-item label="登录Token：" prop="token">
-            <el-input v-model="form.token" clearable disabled/>
-          </el-form-item>
-
-          <el-form-item label="选择球场：">
-            <el-select v-model="form.cll_number" placeholder="请选择球场" style="width: 240px">
+          <el-form-item label="选择球场：" prop="cll_number">
+            <el-select
+              v-model="form.cll_number"
+              placeholder="请选择球场"
+              style="width: 240px"
+              clearable
+            >
               <el-option
                 v-for="item in options"
                 :key="item.value"
@@ -51,7 +69,7 @@
               style="width: 140px"
               class="mr-4"
               placeholder="开始时间"
-              start="16:00"
+              start="15:00"
               step="01:00"
               end="23:00"
             />
@@ -59,21 +77,26 @@
               v-model="form.end_time"
               style="margin-left: 10px; width: 140px"
               placeholder="结束时间"
-              start="16:00"
+              start="15:00"
               step="01:00"
               end="23:00"
             />
           </el-form-item>
-          <el-form-item>
+          <div class="el-form-item-btn">
             <el-button @click="onReset">1.重置</el-button>
-            <el-button type="warning" @click="onSetInfo(ruleFormRef)">2.获取球场</el-button>
             <el-button type="primary" @click="onSubmit(ruleFormRef)">3.开抢！</el-button>
-          </el-form-item>
+          </div>
         </el-form>
-        <h2 class="now-date-timer">{{ timeString }}</h2>
       </div>
     </div>
-    <div class="yuqiu-right"></div>
+    <div class="yuqiu-table" style="width: 500px">
+      <el-table :data="addressList" height="250">
+        <el-table-column prop="user_name" label="当前用户" width="80" />
+        <el-table-column prop="course_name" label="我的场地" width="120" />
+        <el-table-column prop="preper_time_text" label="预约时间" width="200"/>
+        <el-table-column fixed="right" prop="status_text" label="预约状态" width="100" />
+      </el-table>
+    </div>
   </div>
 </template>
 
@@ -83,7 +106,6 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getCoursePreper, getCourseList, getAddressList, getSmsCode, onLoginSys } from '@/serve/api'
 import { getStorage, setStorage } from '@/utils/localStorage'
-
 
 // 定义原始数据类型
 interface SourceItem {
@@ -103,8 +125,8 @@ interface RuleForm {
   token: string
   cll_number: string
   start_time: string
-  end_time: string,
-  phone: string,
+  end_time: string
+  phone: string
   code: string
 }
 // do not use same name with ref
@@ -174,6 +196,7 @@ const superYuqiu = async () => {
   const res = await getCoursePreper(params, form.token) // 抢场地接口
   if (res && res.length) {
     options.value = transformData(res)
+    console.log('-----------dsds', options.value)
     ElMessage.success('获取成功,请选择场地')
   } else {
     console.log('接口请求失败')
@@ -222,6 +245,7 @@ const onSetInfo = (formEl: FormInstance | undefined) => {
         const res = await getCourseList(params, form.token)
         if (res && res.length) {
           options.value = transformData(res)
+          console.log('-----------000', options.value)
           ElMessage.success('获取成功,请选择场地')
         } else {
           console.log('接口请求失败')
@@ -237,27 +261,28 @@ const onSetInfo = (formEl: FormInstance | undefined) => {
 
 const onAddressList = async () => {
   try {
+    if (!form.token) return
     const params = {
       limit: 20,
       page: 1,
-      type: 3
+      type: 3,
     }
-    const { code, data, msg } = await getAddressList(params, form.token)
-    if (code === 0) {
-      addressList.value = data
+    const res = await getAddressList(params, form.token)
+    console.log('--------ds', res)
+    if (res) {
+      addressList.value = res
+      console.log(addressList.value)
     } else {
       ElMessage.success('列表接口请求失败')
     }
-  } catch (error) {
-
-  }
+  } catch (error) {}
 }
 
 const onGetSmsCode = async () => {
   try {
     if (form.phone === '') return
     const params = {
-      mobile: form.phone
+      mobile: form.phone,
     }
     const { code, data, msg } = await getSmsCode(params, form.token)
     if (code === 0) {
@@ -265,9 +290,7 @@ const onGetSmsCode = async () => {
     } else {
       ElMessage.success('短信发送失败')
     }
-  } catch (error) {
-
-  }
+  } catch (error) {}
 }
 
 const onLogin = async () => {
@@ -275,20 +298,28 @@ const onLogin = async () => {
     const params = {
       mobile: form.phone,
       sms_code: form.code,
-      login_type: 2
+      login_type: 2,
     }
-    const { code, data, msg } = await onLoginSys(params)
-
-    if (code === 0) {
+    const res = await onLoginSys(params, '')
+    if (res.token) {
       ElMessage.success('登录成功')
       loginStatus.value = 0
-      setStorage('yuqiu_token', data.token)
-      console.log(data.token)
+      const userToken = 'sun ' + res.token
+      form.token = userToken
+      setStorage('yuqiu_token', userToken)
+      // sun gZgNK0trWbqkVaGYw5RGR4sVYe/8FbaB4ssDJvejGJk=
+      console.log('-------------sto', getStorage('yuqiu_token'))
     } else {
       ElMessage.success('登录失败')
     }
-  } catch (error) {
-    
+  } catch (error) {}
+}
+
+// 初始化登录信息
+const initLogin = async () => {
+  const token = getStorage('yuqiu_token')
+  if (token) {
+    form.token = token
   }
 }
 
@@ -305,6 +336,7 @@ displayCurrentTime()
 setInterval(displayCurrentTime, 500)
 
 onMounted(() => {
+  initLogin()
   onAddressList()
 })
 </script>
@@ -313,19 +345,24 @@ onMounted(() => {
 .yuqiu {
   color: #000;
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  flex-direction: column;
 
   width: 100vw;
   height: 100vh;
 
   .yuqiu-left {
-    flex: 1;
-    height: 100vh;
+    width: 560px;
     background-color: #fff;
 
     .yuqiu-left-content-from {
       border-radius: 20px;
-      padding: 60px 10px 10px 10px;
+      padding: 40px 10px 10px 10px;
+
+      .el-form-item-btn {
+        display: flex;
+        justify-content: flex-end;
+      }
     }
 
     .now-date-timer {
@@ -333,10 +370,6 @@ onMounted(() => {
       font-size: 20px;
       font-weight: bold;
     }
-  }
-  .yuqiu-right {
-    flex: 2;
-    background-color: #eef5fe;
   }
 }
 </style>

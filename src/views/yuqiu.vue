@@ -47,7 +47,7 @@
             />
           </el-form-item>
 
-          <el-form-item label="选择球场：" prop="cll_number">
+          <el-form-item label="选择球场：">
             <el-select
               v-model="form.cll_number"
               placeholder="请选择球场"
@@ -84,16 +84,17 @@
           </el-form-item>
           <div class="el-form-item-btn">
             <el-button @click="onReset">1.重置</el-button>
-            <el-button type="primary" @click="onSubmit(ruleFormRef)">3.开抢！</el-button>
+            <el-button type="primary" @click="onSubmit(ruleFormRef)">2.暴风开抢！</el-button>
+            <el-button type="warning" @click="stopTimeCheck">3.手动结束</el-button>
           </div>
         </el-form>
       </div>
     </div>
-    <div class="yuqiu-table" style="width: 500px">
-      <el-table :data="addressList" height="250">
-        <el-table-column prop="user_name" label="当前用户" width="80" />
-        <el-table-column prop="course_name" label="我的场地" width="120" />
-        <el-table-column prop="preper_time_text" label="预约时间" width="200"/>
+    <div class="yuqiu-table" style="width: 560px">
+      <el-table :data="addressList" height="300">
+        <el-table-column prop="user_name" label="当前用户" width="100" />
+        <el-table-column prop="course_name" label="我的场地" />
+        <el-table-column prop="preper_time_text" label="预约时间" width="200" />
         <el-table-column fixed="right" prop="status_text" label="预约状态" width="100" />
       </el-table>
     </div>
@@ -102,7 +103,6 @@
 
 <script setup lang="ts">
 import { reactive, ref, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { getCoursePreper, getCourseList, getAddressList, getSmsCode, onLoginSys } from '@/serve/api'
 import { getStorage, setStorage } from '@/utils/localStorage'
@@ -172,13 +172,13 @@ function generateTimestamp(timeStr: {
   }
 }) {
   // 获取当前日期
-  const now = new Date()
+  const specificDate = new Date(form.new_date)
 
   // 分割传入的时间字符串
   const [hours, minutes] = timeStr.split(':').map(Number)
 
   // 设置时间为今天的指定时分，秒为0
-  const targetTime = new Date(now)
+  const targetTime = new Date(specificDate)
   targetTime.setHours(hours, minutes, 0, 0) // 秒和毫秒都设为0
 
   // 返回秒级时间戳（注意：JS的Date.getTime()返回的是毫秒，所以要除以1000）
@@ -195,29 +195,24 @@ const superYuqiu = async () => {
   }
   const res = await getCoursePreper(params, form.token) // 抢场地接口
   if (res && res.length) {
-    options.value = transformData(res)
-    console.log('-----------dsds', options.value)
-    ElMessage.success('获取成功,请选择场地')
+    console.log('---------res', res)
   } else {
-    console.log('接口请求失败')
+    console.log('接口请求失败QAQ')
   }
 }
 const onSubmit = (formEl: FormInstance | undefined) => {
   try {
     if (!formEl) return
+    timeCheckActive = true
     formEl.validate(async (valid, fields) => {
       if (valid) {
-        const interval = 20 // 每20毫秒请求一次
-        const duration = 3000 // 总共持续3000毫秒（3秒）
+        // 启动初始时间检查
+        checkTimeAndStartTimer()
 
-        // 启动定时器，每20毫秒执行一次
-        const timer = setInterval(superYuqiu, interval)
-
-        // 设置5秒后清除定时器，停止请求
-        setTimeout(() => {
-          clearInterval(timer)
-          ElMessage.success('狂飙结束')
-        }, duration)
+        ElMessage({
+          message: '开始监听！',
+          type: 'success',
+        })
       } else {
         console.log('error submit!', fields)
       }
@@ -227,8 +222,74 @@ const onSubmit = (formEl: FormInstance | undefined) => {
   }
 }
 
+const interval = 30 // 每20毫秒请求一次
+const maxCalls = 50 // 最大调用次数
+
+let callCount = 0 // 当前调用次数
+let timeCheckActive = true // 时间检查是否活跃
+
+function startTimer() {
+  const timer = setInterval(() => {
+    if (callCount >= maxCalls) {
+      clearInterval(timer)
+
+      onAddressList()
+      ElMessage({
+        message: '执行结束！球场列表已刷新～',
+        type: 'success',
+      })
+    } else {
+      superYuqiu()
+      callCount++
+    }
+  }, interval)
+}
+
+// 检查当前时间是否为15:00
+function checkTimeAndStartTimer() {
+  if (!timeCheckActive) return
+  const now = new Date()
+  const targetHour = 14
+  const targetMinute = 59
+  console.log(
+    '------高频监听ing...',
+    now.getHours(),
+    now.getMinutes(),
+    now.getSeconds(),
+    now.getMilliseconds(),
+  )
+  if (
+    now.getHours() === targetHour &&
+    now.getMinutes() === targetMinute &&
+    now.getSeconds() === 59 &&
+    now.getMilliseconds() < 999
+  ) {
+    startTimer()
+    ElMessage({
+      message: '已触发自动抢场地！',
+      type: 'success',
+    })
+    timeCheckActive = false // 停止时间检查
+  } else {
+    // 如果不是15:00，则等待20毫秒再次检查
+    setTimeout(checkTimeAndStartTimer, interval)
+  }
+}
+
+// 结束时间检查的方法
+function stopTimeCheck() {
+  timeCheckActive = false
+  ElMessage({
+    message: '超级羽球已停止！',
+    type: 'info',
+  })
+}
+
 const onReset = () => {
-  console.log('reset!')
+  ElMessage({
+    message: '重置成功,重新选择抢场地时间！',
+    type: 'success',
+  })
 }
 
 const onSetInfo = (formEl: FormInstance | undefined) => {
@@ -242,11 +303,10 @@ const onSetInfo = (formEl: FormInstance | undefined) => {
     if (!formEl) return
     formEl.validate(async (valid, fields) => {
       if (valid) {
-        const res = await getCourseList(params, form.token)
+        const res = await getCourseList(params, form.token) // 获取有效球场
         if (res && res.length) {
           options.value = transformData(res)
-          console.log('-----------000', options.value)
-          ElMessage.success('获取成功,请选择场地')
+          ElMessage.success('获取成功,请选择球场')
         } else {
           console.log('接口请求失败')
         }
@@ -259,6 +319,7 @@ const onSetInfo = (formEl: FormInstance | undefined) => {
   }
 }
 
+// 获取我的预约球场列表
 const onAddressList = async () => {
   try {
     if (!form.token) return
@@ -268,12 +329,13 @@ const onAddressList = async () => {
       type: 3,
     }
     const res = await getAddressList(params, form.token)
-    console.log('--------ds', res)
     if (res) {
       addressList.value = res
-      console.log(addressList.value)
     } else {
-      ElMessage.success('列表接口请求失败')
+      ElMessage({
+        message: '列表接口请求失败QAQ',
+        type: 'error',
+      })
     }
   } catch (error) {}
 }
@@ -288,7 +350,7 @@ const onGetSmsCode = async () => {
     if (code === 0) {
       ElMessage.success('短信发送成功')
     } else {
-      ElMessage.success('短信发送失败')
+      ElMessage.error('短信发送失败QAQ')
     }
   } catch (error) {}
 }
@@ -310,7 +372,7 @@ const onLogin = async () => {
       // sun gZgNK0trWbqkVaGYw5RGR4sVYe/8FbaB4ssDJvejGJk=
       console.log('-------------sto', getStorage('yuqiu_token'))
     } else {
-      ElMessage.success('登录失败')
+      ElMessage.success('登录失败QAQ')
     }
   } catch (error) {}
 }
